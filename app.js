@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.1.1';
 
 /* ---------- 設定 ---------- */
 
@@ -150,18 +150,112 @@ function makeGunBuffer(ctx) {
   return buf;
 }
 
-function fireGun() {
-  if (!audioCtx || !gunBuffer) return;
-  if (audioCtx.state !== 'running') audioCtx.resume().catch(() => {});
-  masterGain.gain.value = settings.volume;
-  const src = audioCtx.createBufferSource();
-  src.buffer = gunBuffer;
-  src.connect(masterGain);
-  src.start(0);
+/*
+ * 号砲の再生
+ * iPhone では掛け声（音声読み上げ）が流れると Web Audio が一時停止され、
+ * 画面操作なしでは再開できないことがある。そこで合成した号砲を WAV にして
+ * <audio> 要素で鳴らす。<audio> はスタートを押した時点で再生許可を取っておく。
+ * <audio> で鳴らせなかったときだけ Web Audio で鳴らす。
+ */
+let gunEl = null;
+let gunUrl = null;
+let gunUrlVol = null;
+let unlockToken = 0;
 
+/** AudioBuffer を 16bit PCM の WAV にする（iOS は audio.volume が効かないので音量を焼き込む） */
+function encodeWav(buffer, gain) {
+  const chs = buffer.numberOfChannels;
+  const sr = buffer.sampleRate;
+  const n = buffer.length;
+  const size = 44 + n * chs * 2;
+  const dv = new DataView(new ArrayBuffer(size));
+  const str = (o, s) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
+  str(0, 'RIFF'); dv.setUint32(4, size - 8, true); str(8, 'WAVE');
+  str(12, 'fmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, chs, true);
+  dv.setUint32(24, sr, true); dv.setUint32(28, sr * chs * 2, true); dv.setUint16(32, chs * 2, true); dv.setUint16(34, 16, true);
+  str(36, 'data'); dv.setUint32(40, n * chs * 2, true);
+  const data = [];
+  for (let c = 0; c < chs; c++) data.push(buffer.getChannelData(c));
+  let o = 44;
+  for (let i = 0; i < n; i++) {
+    for (let c = 0; c < chs; c++) {
+      const v = Math.max(-1, Math.min(1, data[c][i] * gain));
+      dv.setInt16(o, v < 0 ? v * 0x8000 : v * 0x7fff, true);
+      o += 2;
+    }
+  }
+  return new Blob([dv], { type: 'audio/wav' });
+}
+
+function prepareGunElement() {
+  if (!gunBuffer) return;
+  if (!gunEl) {
+    gunEl = new Audio();
+    gunEl.preload = 'auto';
+    gunEl.setAttribute('playsinline', '');
+  }
+  if (gunUrlVol !== settings.volume) {
+    if (gunUrl) URL.revokeObjectURL(gunUrl);
+    gunUrl = URL.createObjectURL(encodeWav(gunBuffer, settings.volume));
+    gunUrlVol = settings.volume;
+    gunEl.src = gunUrl;
+    gunEl.load();
+  }
+}
+
+/** ユーザー操作の中で呼ぶ：無音で一度再生して、あとからタイマーで鳴らせるようにする */
+function unlockGunElement() {
+  prepareGunElement();
+  if (!gunEl) return;
+  const token = ++unlockToken;
+  gunEl.muted = true;
+  const p = gunEl.play();
+  const done = () => {
+    if (token !== unlockToken) return; // その間に本番の号砲が鳴っていたら触らない
+    gunEl.pause();
+    gunEl.currentTime = 0;
+    gunEl.muted = false;
+  };
+  if (p && p.then) p.then(done, () => { if (token === unlockToken) gunEl.muted = false; });
+  else done();
+}
+
+function playGunWebAudio() {
+  if (!audioCtx || !gunBuffer) return false;
+  const start = () => {
+    masterGain.gain.value = settings.volume;
+    const src = audioCtx.createBufferSource();
+    src.buffer = gunBuffer;
+    src.connect(masterGain);
+    src.start(0);
+  };
+  if (audioCtx.state === 'running') { start(); return true; }
+  return audioCtx.resume().then(() => {
+    if (audioCtx.state !== 'running') return false;
+    start();
+    return true;
+  }, () => false);
+}
+
+/** 号砲を鳴らす。鳴らせたら true */
+async function fireGun() {
   flashEl.classList.remove('on');
   void flashEl.offsetWidth; // アニメーションを再始動
   flashEl.classList.add('on');
+
+  unlockToken++; // 解錠処理による pause を無効化
+  prepareGunElement();
+  if (gunEl) {
+    try {
+      gunEl.muted = false;
+      gunEl.currentTime = 0;
+      await gunEl.play();
+      return true;
+    } catch (e) {
+      console.warn('audio要素で再生できませんでした', e);
+    }
+  }
+  return await playGunWebAudio();
 }
 
 /* ---------- 掛け声（Web Speech API） ---------- */
@@ -352,8 +446,9 @@ async function runSequence() {
     const delay = randomSetDelay();
     await wait(delay * 1000);
 
-    fireGun();
     show('bang', 'GO!', `${words.setLabel} → 号砲  ${delay.toFixed(2)} 秒`);
+    const ok = await fireGun();
+    if (!ok && id === runId) show('bang', 'GO!', '号砲を再生できませんでした（音量・マナーモードを確認）');
   } catch (e) {
     if (!(e instanceof Cancelled)) {
       console.error(e);
@@ -385,6 +480,7 @@ startBtn.addEventListener('click', () => {
   if (running) { stopSequence(); return; }
   // ユーザー操作の中でオーディオと音声を解錠しておく
   ensureAudio();
+  unlockGunElement();
   unlockSpeech();
   runSequence();
 });

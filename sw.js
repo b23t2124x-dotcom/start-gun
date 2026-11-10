@@ -1,6 +1,6 @@
 // 号砲スターター Service Worker
 // ファイルを更新したら CACHE_VERSION を上げてください（古いキャッシュが削除されます）
-const CACHE_VERSION = 'v1.1.0';
+const CACHE_VERSION = 'v1.1.1';
 const CACHE_NAME = `gouhou-${CACHE_VERSION}`;
 
 const ASSETS = [
