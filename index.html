@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1115">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="号砲">
+  <meta name="description" content="陸上のスタート練習用 号砲アプリ">
+  <title>号砲スターター</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="flash" aria-hidden="true"></div>
+
+  <main>
+    <section id="stage" class="stage" data-state="idle" aria-live="polite">
+      <div id="phase" class="phase">READY</div>
+      <div id="sub" class="sub">スタートを押してください</div>
+    </section>
+
+    <div class="controls">
+      <button id="startBtn" class="start" type="button">スタート</button>
+    </div>
+
+    <section class="card" id="settings">
+      <h2>設定</h2>
+
+      <div class="row">
+        <div class="label">開始までの待ち時間<small>スタートを押してから「On your marks」まで</small></div>
+        <div class="stepper" data-key="prep">
+          <button type="button" data-d="-1" aria-label="減らす">−</button>
+          <output></output>
+          <button type="button" data-d="1" aria-label="増やす">＋</button>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="label">On your marks → Set<small>掛け声が終わってから</small></div>
+        <div class="stepper" data-key="marks">
+          <button type="button" data-d="-1" aria-label="減らす">−</button>
+          <output></output>
+          <button type="button" data-d="1" aria-label="増やす">＋</button>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="label">Set → 号砲（基準）<small>掛け声が終わってから</small></div>
+        <div class="stepper" data-key="setBase">
+          <button type="button" data-d="-1" aria-label="減らす">−</button>
+          <output></output>
+          <button type="button" data-d="1" aria-label="増やす">＋</button>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="label">ランダム幅（±）<small id="rangeNote"></small></div>
+        <div class="stepper" data-key="setRand">
+          <button type="button" data-d="-1" aria-label="減らす">−</button>
+          <output></output>
+          <button type="button" data-d="1" aria-label="増やす">＋</button>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="label">掛け声</div>
+        <div class="seg" role="radiogroup" aria-label="掛け声の言語">
+          <button type="button" data-lang="en" role="radio">English</button>
+          <button type="button" data-lang="ja" role="radio">日本語</button>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="label">声<small id="voiceNote"></small></div>
+        <select id="voiceSel" aria-label="掛け声の声"></select>
+      </div>
+
+      <div class="row">
+        <div class="label">声の高さ<small>左ほど低く太い声</small></div>
+        <input id="pitch" type="range" min="0.5" max="1.5" step="0.05" aria-label="声の高さ">
+      </div>
+
+      <div class="row">
+        <div class="label">号砲の音量</div>
+        <input id="volume" type="range" min="0.1" max="1" step="0.05" aria-label="号砲の音量">
+      </div>
+
+      <div class="row buttons">
+        <button id="testGun" type="button" class="ghost">号砲テスト</button>
+        <button id="testVoice" type="button" class="ghost">掛け声テスト</button>
+      </div>
+    </section>
+
+    <p class="note">
+      iPhoneは本体の音量ボタンで音量を上げてください。マナーモードでも鳴るよう設定していますが、鳴らない場合はマナーモードを解除してください。
+    </p>
+    <footer>v<span id="ver"></span></footer>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
